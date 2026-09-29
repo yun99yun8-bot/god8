@@ -1,0 +1,49 @@
+# One-time ZIP deployment bootstrap. Keep this file in the GitHub repository root.
+databases:
+  - name: god8-db
+    plan: 0.5c-1g
+    region: oregon
+    diskSizeGB: 15
+services:
+  - type: web
+    name: god8-web
+    runtime: python
+    plan: 0.5c-512mb
+    region: oregon
+    autoDeployTrigger: commit
+    buildCommand: python deploy_from_zip.py && pip install -r requirements.txt
+    startCommand: python -c 'from core import init_db; init_db()' && gunicorn -c gunicorn.conf.py -b 0.0.0.0:$PORT web:app
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {name: god8-db, property: connectionString}
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: ADMIN_TOKEN
+        generateValue: true
+  - type: worker
+    name: god8-collector
+    runtime: python
+    plan: 0.5c-512mb
+    region: oregon
+    autoDeployTrigger: commit
+    buildCommand: python deploy_from_zip.py && pip install -r requirements.txt
+    startCommand: python collector_service.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {name: god8-db, property: connectionString}
+      - key: PYTHON_VERSION
+        value: 3.13.7
+  - type: worker
+    name: god8-worker-ai
+    runtime: python
+    plan: 0.5c-512mb
+    region: oregon
+    autoDeployTrigger: commit
+    buildCommand: python deploy_from_zip.py && pip install -r requirements.txt
+    startCommand: python worker_ai.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: {name: god8-db, property: connectionString}
+      - key: PYTHON_VERSION
+        value: 3.13.7
